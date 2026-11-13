@@ -1,0 +1,25 @@
+# Dependencies (Leaflet is copied into public/vendor by `npm install`; that copy IS committed
+# so the public/ folder can be deployed to any static host as-is)
+node_modules/
+
+# Environment / secrets (e.g. keyed tile server URLs)
+.env
+.env.*
+
+# OS / editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Logs & local exports
+npm-debug.log*
+*.log
+places-*.json
+places-*.csv
+*.gpx
+
+# Claude Code local settings
+.claude/settings.local.json

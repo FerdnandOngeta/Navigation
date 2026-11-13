@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#146c43">
+  <meta name="description" content="Offline-first navigation for field teams in remote areas.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Field Navigator</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="map" aria-label="Map"></div>
+
+  <header id="topbar">
+    <div class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="search" placeholder="Search places, address or lat, lng" autocomplete="off" enterkeyhint="search">
+    </div>
+    <button id="net-pill" class="pill" title="Connection quality">…</button>
+  </header>
+  <div id="search-results" class="results" hidden></div>
+
+  <section id="hud" hidden aria-live="polite">
+    <div class="hud-from" id="hud-from" hidden></div>
+    <div class="hud-main">
+      <div class="arrow-wrap"><svg id="hud-arrow" viewBox="0 0 100 100"><path d="M50 6 80 88 50 70 20 88Z"/></svg></div>
+      <div class="hud-text">
+        <div class="hud-dist" id="hud-dist">–</div>
+        <div class="hud-sub" id="hud-sub">Waiting for GPS…</div>
+      </div>
+      <button id="hud-photos" class="hud-thumb" title="What the destination looks like" hidden></button>
+    </div>
+    <div class="hud-step" id="hud-step" hidden></div>
+    <div class="hud-actions">
+      <button id="hud-landmark" class="btn small">📷 Landmark</button>
+      <button id="hud-center" class="btn small">◎ Follow</button>
+      <button id="hud-stop" class="btn small danger">Stop</button>
+    </div>
+  </section>
+
+  <section id="nearby" hidden aria-live="off">
+    <button id="nearby-head" class="nearby-head" title="Show / hide">
+      <span>Nearest places</span><span id="nearby-summary" class="nearby-summary"></span><span id="nearby-chev">▾</span>
+    </button>
+    <table id="nearby-table"><tbody id="nearby-list"></tbody></table>
+  </section>
+
+  <div class="fabs">
+    <button id="btn-layers" class="fab" title="Map style">
+      <svg viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></svg>
+    </button>
+    <button id="btn-locate" class="fab" title="My location">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
+  </div>
+
+  <section id="sheet" class="sheet" hidden>
+    <div class="sheet-head">
+      <h2 id="sheet-title"></h2>
+      <button id="sheet-close" class="icon-btn" aria-label="Close">✕</button>
+    </div>
+    <div id="sheet-body"></div>
+  </section>
+
+  <nav id="tabbar">
+    <button data-tab="places"><span>📍</span>Places</button>
+    <button data-tab="add"><span>＋</span>Add</button>
+    <button data-tab="offline"><span>⬇</span>Offline</button>
+    <button data-tab="settings"><span>⚙</span>Settings</button>
+  </nav>
+
+  <div id="toast" role="status" hidden></div>
+  <input id="file-import" type="file" accept=".json,.geojson,.csv,text/csv,application/json" hidden>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

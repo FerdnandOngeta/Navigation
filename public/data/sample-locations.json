@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [34.7520, -0.1010] },
+      "properties": { "name": "Sample: Kisumu Town Office", "category": "Office", "code": "S-001",
+        "description": "Example location bundled with the app. Delete it once you import your own sites.",
+        "landmarks": "Two-storey building opposite the bus stage. Green gate." } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [34.5160, -0.1040] },
+      "properties": { "name": "Sample: Lakeside Health Centre", "category": "Health facility", "code": "S-002",
+        "description": "Example rural health facility.",
+        "landmarks": "Turn off the tarmac at the blue church. Follow the murram road ~2 km; facility has a white water tank." } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [34.8890, -0.0420] },
+      "properties": { "name": "Sample: Hilltop Primary School", "category": "School", "code": "S-003",
+        "description": "Example school on a hill — last 800 m is a footpath.",
+        "landmarks": "Leave vehicle at the shopping centre. Footpath starts behind the posho mill." } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [34.9190, -0.1720] },
+      "properties": { "name": "Sample: Water Point 14", "category": "Water point", "code": "S-004",
+        "description": "Example borehole with chlorine dispenser.",
+        "landmarks": "Next to a large fig tree, 50 m from the market." } },
+    { "type": "Feature", "geometry": { "type": "Point", "coordinates": [34.6600, -0.0700] },
+      "properties": { "name": "Sample: Village Meeting Point", "category": "Community", "code": "S-005",
+        "description": "Example village gathering point.",
+        "landmarks": "Under the mango trees beside the chief's camp." } }
+  ]
+}
