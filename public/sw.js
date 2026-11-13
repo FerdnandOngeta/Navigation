@@ -2,7 +2,7 @@
 // Map tiles are cached separately by the page (js/tiles.js) in the 'fn-tiles-v1' cache,
 // which this worker deliberately never deletes on upgrade.
 // Bump VERSION whenever any file in SHELL changes so installed apps pick up the update.
-const VERSION = 'fn-shell-v3';
+const VERSION = 'fn-shell-v4';
 const SHELL = [
   './',
   'index.html',

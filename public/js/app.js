@@ -997,6 +997,21 @@ function fromOptions(dest) {
     ${others.length ? `<optgroup label="Saved places">${others.map((l) => `<option value="${esc(l.id)}" ${sel(l.id)}>${esc(l.name)}</option>`).join('')}</optgroup>` : ''}`;
 }
 
+/** Turns a "Starting from" option value into { name, lat, lng }, or null for GPS / map pick. */
+function resolveFromChoice(choice) {
+  if (choice === 'pin') return state.pendingFrom || null;
+  if (choice === 'gps' || choice === 'pick') return null;
+  const o = state.locations.find((l) => l.id === choice);
+  return o ? { id: o.id, name: o.name, lat: o.lat, lng: o.lng } : null;
+}
+
+function addStartMarker(from) {
+  L.marker([from.lat, from.lng], {
+    icon: L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<div class="start-marker">A</div>' }),
+    title: `Start: ${from.name}`,
+  }).addTo(routeLayer);
+}
+
 function pickStartOnMap(loc, profile) {
   closeSheet();
   state.picking = { loc, profile };
@@ -1021,7 +1036,7 @@ async function openPlace(loc) {
   const navigatingHere = nav.target?.id === loc.id;
   const body = openSheet(loc.name, `
     ${galleryHtml(photos)}
-    ${d != null ? `<p><b>${formatDistance(d)}</b> ${compassLabel(bearing(p.lat, p.lng, loc.lat, loc.lng))} of you (straight line)</p>` : ''}
+    <p id="pd-dist">${d != null ? `<b>${formatDistance(d)}</b> ${compassLabel(bearing(p.lat, p.lng, loc.lat, loc.lng))} of you (straight line)` : ''}</p>
     ${loc.landmarks ? `<div class="section-title">How to recognise it</div><div class="landmark-text">${esc(loc.landmarks)}</div>` : ''}
     ${loc.description ? `<p>${esc(loc.description)}</p>` : ''}
     ${navigatingHere ? '' : `<div class="section-title">Travel by</div>${seg('profile', PROFILE_LABELS, state.settings.profile)}
@@ -1053,6 +1068,17 @@ async function openPlace(loc) {
   let profile = state.settings.profile;
   if (!navigatingHere) {
     bindSeg(body, 'profile', (v) => { profile = v; saveSettings({ profile: v }); });
+    // Distance line follows the "Starting from" choice: from that start point, not from the user.
+    const fromSel = $('#pd-from', body);
+    const showDist = () => {
+      const o = resolveFromChoice(fromSel.value);
+      const el = $('#pd-dist', body);
+      if (o) el.innerHTML = `<b>${formatDistance(distance(o.lat, o.lng, loc.lat, loc.lng))}</b> ${compassLabel(bearing(o.lat, o.lng, loc.lat, loc.lng))} of ${esc(o.name)} (straight line)`;
+      else if (fromSel.value === 'pick') el.textContent = 'Distance will be measured from the point you pick on the map.';
+      else el.innerHTML = d != null ? `<b>${formatDistance(d)}</b> ${compassLabel(bearing(p.lat, p.lng, loc.lat, loc.lng))} of you (straight line)` : 'Waiting for GPS to measure the distance from you.';
+    };
+    fromSel.onchange = showDist;
+    showDist();
     $('#pd-nav', body).onclick = () => {
       const choice = $('#pd-from', body).value;
       state.lastFromChoice = choice;
@@ -1343,7 +1369,8 @@ async function startNavigation(loc, profile = state.settings.profile, from = nul
   thumbBtn.hidden = !loc.thumb;
   if (loc.thumb) thumbBtn.style.backgroundImage = `url('${loc.thumb}')`;
   routeLayer.clearLayers();
-  setFollow(true);
+  if (from) addStartMarker(from); // visible even before / without a road route
+  setFollow(!from); // planning from elsewhere: keep the overview rather than chasing the GPS dot
   nav.arrivalRadius = Number(state.settings.arrivalRadius) || 40;
   nav.enableCompass();
   const landmarks = await showLandmarks(loc);
@@ -1378,10 +1405,7 @@ function drawRoute({ route, fromCache }) {
   if (t && !t.id) L.marker([t.lat, t.lng], { icon: pinIcon({ ...t, name: '★' }) }).addTo(routeLayer);
   const from = nav.from;
   if (from) {
-    L.marker([from.lat, from.lng], {
-      icon: L.divIcon({ className: '', iconSize: [30, 30], iconAnchor: [15, 15], html: '<div class="start-marker">A</div>' }),
-      title: `Start: ${from.name}`,
-    }).addTo(routeLayer);
+    addStartMarker(from);
     // Dashed link if the chosen start point is off the road network.
     const s0 = route.coords[0];
     if (distance(s0[0], s0[1], from.lat, from.lng) > 30) L.polyline([[from.lat, from.lng], s0], { color: '#1a73e8', weight: 3, dashArray: '4 8' }).addTo(routeLayer);
@@ -1402,21 +1426,13 @@ function drawRoute({ route, fromCache }) {
 function updateHud(s) {
   if (!s.target) return;
   const arrow = $('#hud-arrow');
+  if (s.planned) { updatePlannedHud(s); return; }
   if (!s.hasFix) {
-    if (s.route) {
-      // Planned route (chosen start point) but no GPS yet — still show the plan.
-      const total = s.route.distance + (s.lastMile || 0);
-      $('#hud-dist').textContent = formatDistance(total);
-      $('#hud-sub').textContent = `Planned route · ~${formatDuration(s.route.duration)} · waiting for GPS to guide you`;
-      const step = $('#hud-step');
-      step.classList.remove('warn');
-      step.textContent = s.route.steps[0] ? `First: ${s.route.steps[0].text}` : '';
-      step.hidden = !step.textContent;
-    } else $('#hud-sub').textContent = 'Waiting for GPS… (go outdoors, away from buildings)';
+    $('#hud-sub').textContent = 'Waiting for GPS… (go outdoors, away from buildings)';
     return;
   }
   // With a compass the arrow points where to walk; without one it shows the bearing on a north-up map.
-  const rot = s.relative ?? s.bearing;
+  const rot = s.relative ?? s.arrowBearing ?? s.bearing;
   arrow.style.transform = `rotate(${rot}deg)`;
   arrow.classList.toggle('no-compass', s.relative == null);
   // Road distance while on the road; once off it (or off route) the straight line is what matters.
@@ -1434,7 +1450,6 @@ function updateHud(s) {
   step.classList.remove('warn');
   let text = '';
   if (s.arrived) text = `You are within ${Math.round(s.distance)} m of ${s.target.name}. Look for the landmarks in the photos.`;
-  else if (s.route && s.notJoined) text = `Route starts at ${nav.from?.name || 'the start point'}: ${formatDistance(s.toStart)} ${s.toStartLabel} of you. Guidance begins when you reach it.`;
   else if (s.route && s.offRoute) { text = `Off the route — head ${s.bearingLabel}. ${network.online ? 'Re-routing soon…' : 'Offline: follow the arrow.'}`; step.classList.add('warn'); }
   else if (s.route && !s.onRoad && s.lastMile > 60) text = `Leave the road: ${formatDistance(s.lastMile)} ${s.bearingLabel} on foot/track to the destination.`;
   else if (s.nextStep) text = `In ${formatDistance(s.nextStep.distance)}: ${s.nextStep.text}`;
@@ -1445,6 +1460,37 @@ function updateHud(s) {
   const p = nav.position;
   straightLine.setLatLngs(!s.route && !s.arrived ? [[p.lat, p.lng], [s.target.lat, s.target.lng]] : []);
   trackLine.setLatLngs(nav.track.map(([a, b]) => [a, b]));
+}
+
+/**
+ * HUD for a trip planned from a chosen start point: every figure is start point → destination.
+ * Only the small "go to the start" line and the arrow use the user's live position.
+ */
+function updatePlannedHud(s) {
+  const from = s.measuredFrom;
+  $('#hud-dist').textContent = formatDistance(s.remaining);
+  const bits = [];
+  if (s.route) bits.push(`${formatDistance(s.distance)} direct`);
+  bits.push(`${s.bearingLabel} ${Math.round(s.bearing)}° from start`);
+  if (s.eta) bits.push(`~${formatDuration(s.eta)}`);
+  $('#hud-sub').textContent = `${s.route ? 'By road' : 'Straight line'} from ${from.name} · ${bits.join(' · ')}`;
+
+  const arrow = $('#hud-arrow');
+  const step = $('#hud-step');
+  step.classList.remove('warn');
+  if (s.hasFix) {
+    // Arrow guides the user to the start point; guidance switches to live once they reach the route.
+    arrow.style.transform = `rotate(${s.relative ?? s.arrowBearing}deg)`;
+    arrow.classList.toggle('no-compass', s.relative == null);
+    step.textContent = `Go to the start (${from.name}): ${formatDistance(s.toStart)} ${s.toStartLabel} of you. Live guidance begins there.`;
+  } else {
+    arrow.style.transform = `rotate(${s.bearing}deg)`;
+    arrow.classList.add('no-compass');
+    step.textContent = s.route?.steps[0] ? `First: ${s.route.steps[0].text}. Waiting for GPS to guide you.` : 'Waiting for GPS to guide you.';
+  }
+  step.hidden = false;
+  // Without a road route, show the planned straight line from the start point (not from the user).
+  straightLine.setLatLngs(!s.route ? [[from.lat, from.lng], [s.target.lat, s.target.lng]] : []);
 }
 
 function openArrival(loc) {

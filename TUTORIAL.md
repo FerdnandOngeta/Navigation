@@ -137,8 +137,17 @@ then tap **▶ Navigate here**.
 Planning from somewhere else is useful before you leave. While you have internet and no GPS fix,
 plan "Office → Site", then use **Offline → Save map along current route**. The route is saved, and
 when you start from that point later it's reused offline. The blue **A** marker shows the start.
-Turn guidance begins once you reach the route; until then the panel says how far the start is and
-in which direction.
+
+When you choose a start point other than your own location, **all distances are measured between
+the start point and the destination**, not from where you're standing:
+- The place page shows, for example, "17 km ENE of Kisumu Town Office" as soon as you pick the
+  start.
+- The panel shows the road distance from the start (e.g. **21 km**), the straight-line distance,
+  the direction from the start, and the travel time for the whole trip.
+- Only the line "Go to the start: 2.7 km SSE of you" and the arrow use your own position, to get
+  you to the start.
+- Once you reach the start (or anywhere on the route), the panel switches to live turn-by-turn
+  guidance from where you are. Arrival is always detected from your real GPS position.
 
 The green panel at the top shows:
 - **Distance**: by road while you're on the road, otherwise straight-line.

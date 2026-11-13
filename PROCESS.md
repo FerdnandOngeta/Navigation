@@ -35,7 +35,7 @@ DevTools → Network → throttling ("Slow 3G") simulates the weak-signal mode.
 `public/sw.js` serves the app shell **cache-first** so the app opens instantly with no signal.
 That means installed copies only pick up changes when the service worker changes:
 
-1. Bump `VERSION` in `public/sw.js` (e.g. `fn-shell-v3` → `fn-shell-v4`).
+1. Bump `VERSION` in `public/sw.js` (e.g. `fn-shell-v4` → `fn-shell-v5`).
 2. If you added a new file to the shell, add it to the `SHELL` list.
 3. Deploy. Users see "A new version is ready — tap to update" on next launch.
 
@@ -43,7 +43,7 @@ Tile caches (`fn-tiles-v1`) are never deleted by a shell update, so saved maps s
 
 During development, either tick DevTools → Application → Service Workers → **Update on reload**,
 or run this in the console before reloading:
-`(await navigator.serviceWorker.getRegistrations()).forEach(r => r.unregister()); caches.delete('fn-shell-v3')`
+`(await navigator.serviceWorker.getRegistrations()).forEach(r => r.unregister()); caches.delete('fn-shell-v4')`
 
 ## Architecture
 
@@ -106,7 +106,11 @@ tests/                      node:test unit tests
   The index is reset in `loadLocations()`.
 - **Chosen start point.** `nav.start(target, { from })` routes from `from` instead of GPS. Until
   the user first comes within range of the route (`joinedRoute`), there are no off-route
-  warnings, re-routes or step advances. The HUD shows the distance to the start instead.
+  warnings, re-routes or step advances. In that phase `nav.state()` returns `planned: true`, and
+  `distance`, `bearing`, `remaining` and `eta` are measured from `from` to the destination, not
+  from GPS. Only `toStart` and the arrow (`arrowBearing`/`relative`) use the live position, and the
+  HUD renders this with `updatePlannedHud()`. Arrival detection always uses the real GPS distance.
+  Covered by `tests/nav.test.js`.
 - **Datasets (import batches).** IndexedDB v2 adds a `datasets` store. The upgrade only creates
   missing stores, so v1 data survives. Each place imported from a table carries `datasetId`.
   `saveImported(parsed, { mode })` has three modes:

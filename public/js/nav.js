@@ -133,7 +133,9 @@ export class Navigator extends EventTarget {
     }
 
     const s = this.state();
-    if (!this.arrived && s.distance <= Math.max(this.arrivalRadius, Math.min(c.accuracy, 80))) {
+    // Arrival always uses the real GPS position (s.distance may be measured from a planned start).
+    const actual = distance(c.latitude, c.longitude, this.target.lat, this.target.lng);
+    if (!this.arrived && actual <= Math.max(this.arrivalRadius, Math.min(c.accuracy, 80))) {
       this.arrived = true;
       s.arrived = true;
       navigator.vibrate?.([200, 100, 200, 100, 400]);
@@ -156,33 +158,58 @@ export class Navigator extends EventTarget {
     this.emit('update', s);
   }
 
+  /**
+   * Navigation figures for the HUD.
+   * - Planned trip (a start point other than "my location" was chosen, and the user hasn't reached
+   *   the route yet): distance, bearing and ETA are measured from that START POINT to the
+   *   destination, not from the user's GPS position. The arrow points the user to the start.
+   * - Otherwise: live figures from the GPS position.
+   */
   state() {
-    const p = this.position, t = this.target;
+    const p = this.position, t = this.target, r = this.route;
     if (!t) return { hasFix: !!p, target: t };
-    if (!p) {
-      const r = this.route;
-      const end = r?.coords[r.coords.length - 1];
-      return { hasFix: false, target: t, route: r, lastMile: end ? distance(end[0], end[1], t.lat, t.lng) : 0 };
+    const end = r?.coords[r.coords.length - 1];
+    const lastMile = end ? distance(end[0], end[1], t.lat, t.lng) : 0;
+
+    // The planned trip "begins" once the user is on the route (or at the start point if no route).
+    if (p && this.from && !this.joinedRoute) {
+      const near = r ? distanceToPolyline(p.lat, p.lng, r.coords) : distance(p.lat, p.lng, this.from.lat, this.from.lng);
+      if (near <= Math.max(70, p.accuracy * 1.5)) this.joinedRoute = true;
     }
+
+    if (this.from && !this.joinedRoute) {
+      const o = this.from;
+      const dist = distance(o.lat, o.lng, t.lat, t.lng);
+      const brg = bearing(o.lat, o.lng, t.lat, t.lng);
+      const out = {
+        planned: true, measuredFrom: o, hasFix: !!p, target: t, route: r, arrived: this.arrived,
+        distance: dist, bearing: brg, bearingLabel: compassLabel(brg), lastMile,
+        remaining: r ? r.cumulative[r.cumulative.length - 1] + lastMile : dist,
+        // Road time plus the off-road last stretch at walking pace (~1.2 m/s).
+        eta: r ? r.duration + (lastMile > 30 ? lastMile / 1.2 : 0) : null,
+        heading: this.heading, accuracy: p?.accuracy,
+      };
+      if (p) {
+        const s0 = r ? { lat: r.coords[0][0], lng: r.coords[0][1] } : o;
+        out.toStart = distance(p.lat, p.lng, s0.lat, s0.lng);
+        out.arrowBearing = bearing(p.lat, p.lng, s0.lat, s0.lng);
+        out.toStartLabel = compassLabel(out.arrowBearing);
+        out.relative = this.heading == null ? null : (out.arrowBearing - this.heading + 360) % 360;
+      }
+      return out;
+    }
+
+    if (!p) return { hasFix: false, target: t, route: r, lastMile };
     const dist = distance(p.lat, p.lng, t.lat, t.lng);
     const brg = bearing(p.lat, p.lng, t.lat, t.lng);
     const out = {
-      hasFix: true, target: t, distance: dist, bearing: brg, bearingLabel: compassLabel(brg),
+      hasFix: true, target: t, distance: dist, bearing: brg, bearingLabel: compassLabel(brg), arrowBearing: brg,
       heading: this.heading, relative: this.heading == null ? null : (brg - this.heading + 360) % 360,
-      accuracy: p.accuracy, arrived: this.arrived, route: this.route,
+      accuracy: p.accuracy, arrived: this.arrived, route: r,
     };
-    const r = this.route;
     if (r) {
       const off = distanceToPolyline(p.lat, p.lng, r.coords);
-      const threshold = Math.max(70, p.accuracy * 1.5);
-      // A route planned from another start point only "begins" once the user reaches it.
-      if (!this.joinedRoute && off <= threshold) this.joinedRoute = true;
-      out.offRoute = this.joinedRoute && off > threshold;
-      if (!this.joinedRoute) {
-        out.notJoined = true;
-        out.toStart = distance(p.lat, p.lng, r.coords[0][0], r.coords[0][1]);
-        out.toStartLabel = compassLabel(bearing(p.lat, p.lng, r.coords[0][0], r.coords[0][1]));
-      }
+      out.offRoute = off > Math.max(70, p.accuracy * 1.5);
       if (out.offRoute) this.offRouteSince ??= Date.now(); else this.offRouteSince = null;
       // Remaining distance along the route from the nearest vertex.
       let nearest = 0, best = Infinity;
@@ -190,10 +217,9 @@ export class Navigator extends EventTarget {
         const d = distance(p.lat, p.lng, r.coords[i][0], r.coords[i][1]);
         if (d < best) { best = d; nearest = i; }
       }
-      const end = r.coords[r.coords.length - 1];
-      out.lastMile = distance(end[0], end[1], t.lat, t.lng);
-      out.remaining = r.cumulative[r.cumulative.length - 1] - r.cumulative[nearest] + out.lastMile;
-      while (this.joinedRoute && this.stepIndex < r.steps.length - 1) {
+      out.lastMile = lastMile;
+      out.remaining = r.cumulative[r.cumulative.length - 1] - r.cumulative[nearest] + lastMile;
+      while (this.stepIndex < r.steps.length - 1) {
         const st = r.steps[this.stepIndex];
         const passed = r.coords.findIndex((c) => c[0] === st.lat && c[1] === st.lng);
         if (distance(p.lat, p.lng, st.lat, st.lng) < Math.max(25, p.accuracy) || (passed >= 0 && passed < nearest)) this.stepIndex++;
